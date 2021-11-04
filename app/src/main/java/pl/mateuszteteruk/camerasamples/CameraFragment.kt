@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.PorterDuff
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
@@ -16,8 +17,14 @@ import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import pl.mateuszteteruk.camerasamples.databinding.FragmentCameraBinding
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -29,6 +36,9 @@ class CameraFragment : Fragment() {
         get() = requireNotNull(_binding)
 
     private lateinit var cameraExecutor: ExecutorService
+
+    private val imageFlow: MutableSharedFlow<ImageProxy> = MutableSharedFlow()
+    private val areaFlow: MutableSharedFlow<Area> = MutableSharedFlow()
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
         _binding = FragmentCameraBinding.inflate(inflater, container, false)
@@ -68,19 +78,14 @@ class CameraFragment : Fragment() {
                 style = Paint.Style.STROKE
                 strokeWidth = 10f
             }
-            val overlay = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
-            val canvas = Canvas(overlay)
+
+            observeCameraImageProxy()
+            observeAreaChanges(bitmap, paint)
 
             analyzer.setAnalyzer(cameraExecutor) { image ->
-
-                val area = calculateArea(image)
-                canvas.drawRect(area.x, area.y, area.x + area.size, area.y + area.size, paint)
-
-                requireActivity().runOnUiThread {
-                    binding.overlay.setImageBitmap(overlay)
+                viewLifecycleOwner.lifecycleScope.launchWhenStarted {
+                    imageFlow.emit(image)
                 }
-                Log.d("TAG", "Area: $area")
-
                 image.close()
             }
 
@@ -96,9 +101,36 @@ class CameraFragment : Fragment() {
         }, ContextCompat.getMainExecutor(requireContext()))
     }
 
+    private fun observeCameraImageProxy() {
+        viewLifecycleOwner.lifecycleScope.launchWhenStarted {
+            imageFlow
+                .map {
+                    calculateArea(it)
+                }
+                .collect {
+                    areaFlow.emit(it)
+                }
+        }
+    }
+
+    private fun observeAreaChanges(bitmap: PreviewView, paint: Paint) {
+        val overlay = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(overlay)
+        viewLifecycleOwner.lifecycleScope.launchWhenStarted {
+            areaFlow
+                .distinctUntilChanged()
+                .collect { area ->
+                    canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
+                    canvas.drawRect(area.x, area.y, area.x + area.size, area.y + area.size, paint)
+                    binding.overlay.setImageBitmap(overlay)
+                    Log.d("TAG", "Area: $area")
+                }
+        }
+    }
+
     private fun calculateArea(image: ImageProxy): Area {
         return Area(
-            x = 300F,
+            x = AreaGenerator.next(),
             y = 300F,
             size = 400F,
         )
@@ -109,4 +141,19 @@ class CameraFragment : Fragment() {
         val y: Float,
         val size: Float,
     )
+}
+
+private object AreaGenerator {
+
+    private val max = 1024F - 400F
+    private var currentOffsetX = 0F
+
+    fun next(): Float {
+        if (currentOffsetX > max) {
+            currentOffsetX = 0F
+        } else {
+            currentOffsetX += 10F
+        }
+        return currentOffsetX
+    }
 }
