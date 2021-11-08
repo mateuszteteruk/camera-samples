@@ -1,13 +1,7 @@
 package pl.mateuszteteruk.camerasamples
 
 import android.annotation.SuppressLint
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.Paint
-import android.graphics.PorterDuff
 import android.os.Bundle
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -17,7 +11,6 @@ import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
@@ -70,19 +63,14 @@ class CameraFragment : Fragment() {
                     setSurfaceProvider(binding.previewFront.surfaceProvider)
                 }
 
-            val analyzer = ImageAnalysis.Builder().build()
-
-            val bitmap = binding.previewFront
-            val paint = Paint().apply {
-                color = Color.MAGENTA
-                style = Paint.Style.STROKE
-                strokeWidth = 10f
-            }
+            val analyzer = ImageAnalysis.Builder()
+                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                .build()
 
             observeCameraImageProxy()
-            observeAreaChanges(bitmap, paint)
+            observeAreaChanges()
 
-            analyzer.setAnalyzer(cameraExecutor) { image ->
+            analyzer.setAnalyzer(cameraExecutor) { image: ImageProxy ->
                 viewLifecycleOwner.lifecycleScope.launchWhenStarted {
                     imageFlow.emit(image)
                 }
@@ -113,17 +101,12 @@ class CameraFragment : Fragment() {
         }
     }
 
-    private fun observeAreaChanges(bitmap: PreviewView, paint: Paint) {
-        val overlay = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(overlay)
+    private fun observeAreaChanges() {
         viewLifecycleOwner.lifecycleScope.launchWhenStarted {
             areaFlow
                 .distinctUntilChanged()
                 .collect { area ->
-                    canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
-                    canvas.drawRect(area.x, area.y, area.x + area.size, area.y + area.size, paint)
-                    binding.overlay.setImageBitmap(overlay)
-                    Log.d("TAG", "Area: $area")
+                    binding.overlay.update(area.x, area.y)
                 }
         }
     }
@@ -131,7 +114,7 @@ class CameraFragment : Fragment() {
     private fun calculateArea(image: ImageProxy): Area {
         return Area(
             x = AreaGenerator.next(),
-            y = 300F,
+            y = 500F,
             size = 400F,
         )
     }
