@@ -20,9 +20,9 @@ class AreaCropView @JvmOverloads constructor(
             xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR)
         }
     }
-    private var currentX = -1f
-    private var currentY = -1f
-    private val mTutorialColor = Color.BLACK
+    private var currentX = 200F
+    private var currentY = 200F
+    private val mTutorialColor = Color.parseColor("#D20E0F02")
 
     init {
         setWillNotDraw(false)
@@ -44,6 +44,6 @@ class AreaCropView @JvmOverloads constructor(
 
     companion object {
 
-        private const val RADIUS = 300f
+        private const val RADIUS = 200f
     }
 }

@@ -2,14 +2,19 @@ package pl.mateuszteteruk.camerasamples
 
 import android.annotation.SuppressLint
 import android.os.Bundle
+import android.util.Rational
 import android.view.LayoutInflater
+import android.view.Surface
 import android.view.View
 import android.view.ViewGroup
 import androidx.camera.core.AspectRatio
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
+import androidx.camera.core.UseCaseGroup
+import androidx.camera.core.ViewPort
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
@@ -60,6 +65,7 @@ class CameraFragment : Fragment() {
                 .setTargetAspectRatio(AspectRatio.RATIO_16_9)
                 .build()
                 .apply {
+//                    binding.previewFront.implementationMode = PreviewView.ImplementationMode.COMPATIBLE
                     setSurfaceProvider(binding.previewFront.surfaceProvider)
                 }
 
@@ -77,11 +83,18 @@ class CameraFragment : Fragment() {
                 image.close()
             }
 
-            val cameraSelector = CameraSelector.DEFAULT_FRONT_CAMERA
+            val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+
+            val viewPort = ViewPort.Builder(Rational(4, 3), Surface.ROTATION_0).build()
+            val usecase = UseCaseGroup.Builder()
+                .addUseCase(preview)
+                .addUseCase(analyzer)
+//                .setViewPort(viewPort)
+                .build()
 
             try {
                 cameraProvider.unbindAll()
-                cameraProvider.bindToLifecycle(viewLifecycleOwner, cameraSelector, preview, analyzer)
+                val camera: Camera = cameraProvider.bindToLifecycle(viewLifecycleOwner, cameraSelector, usecase)
             } catch (exception: Exception) {
 
             }
@@ -106,7 +119,9 @@ class CameraFragment : Fragment() {
             areaFlow
                 .distinctUntilChanged()
                 .collect { area ->
-                    binding.overlay.update(area.x, area.y)
+//                    binding.overlay.update(area.x, area.y)
+//                    binding.previewFront.translationX = area.x
+//                    binding.previewFront.translationY = area.y
                 }
         }
     }
@@ -128,7 +143,7 @@ class CameraFragment : Fragment() {
 
 private object AreaGenerator {
 
-    private val max = 1024F - 400F
+    private val max = 600
     private var currentOffsetX = 0F
 
     fun next(): Float {
