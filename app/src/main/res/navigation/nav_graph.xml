@@ -19,7 +19,7 @@
 
     <fragment
         android:id="@+id/camera_fragment"
-        android:name="pl.mateuszteteruk.camerasamples.CameraFragment"
+        android:name="pl.mateuszteteruk.camerasamples.Camera2PreviewFragment"
         android:label="CameraFragment">
 
         <action
